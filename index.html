@@ -86,11 +86,6 @@
 <main>
 
   <section class="card">
-    <div class="row">
-      <input id="inNombre" type="text" placeholder="Nombre del alumno">
-      <input id="inUrl" type="url" placeholder="Link CSV publicado del Sheet">
-      <button type="button" id="btnAgregar">Agregar y cargar</button>
-    </div>
     <div class="chips" id="chips"></div>
     <div class="row" style="margin-top:.8rem">
       <button type="button" class="secondary" id="btnCombinada">Ver todos combinados</button>
@@ -360,19 +355,6 @@ function renderChips() {
   });
 }
 
-document.getElementById('btnAgregar').addEventListener('click', () => {
-  const nombre = document.getElementById('inNombre').value.trim();
-  const url = document.getElementById('inUrl').value.trim();
-  if (!nombre || !url) { alert('Falta el nombre o el link CSV.'); return; }
-  students = students.filter(s => s.nombre !== nombre);
-  students.push({ nombre, url });
-  saveStudents(students);
-  document.getElementById('inNombre').value = '';
-  document.getElementById('inUrl').value = '';
-  renderChips();
-  loadSingle(nombre, url);
-});
-
 document.getElementById('btnCombinada').addEventListener('click', loadCombined);
 
 document.getElementById('selEstado').addEventListener('change', e => {
@@ -413,8 +395,6 @@ async function loadRegistry() {
   const sheet = params.get('sheet');
   if (sheet) {
     const nombre = params.get('nombre') || 'Alumno';
-    document.getElementById('inNombre').value = students.some(s=>s.nombre===nombre) ? '' : nombre;
-    document.getElementById('inUrl').value = students.some(s=>s.nombre===nombre) ? '' : sheet;
     loadSingle(nombre, sheet);
   } else if (students.length) {
     loadCombined();

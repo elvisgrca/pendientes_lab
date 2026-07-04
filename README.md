@@ -29,18 +29,17 @@ primera mitad del mes) asume `dd/mm/aaaa` por default.
 
 ## Uso
 
-Abrir `index.html` (o la versión en GitHub Pages), pegar el nombre del alumno y
-el link CSV, "Agregar y cargar". Queda guardado en el navegador (localStorage) de
-quien lo abre, no hay servidor ni login.
+Abrir `index.html` (o la versión en GitHub Pages). La lista de alumnos se carga
+sola desde el Sheet índice (ver sección de abajo); no hay que pegar nada a mano.
 
-- Por defecto se ocultan los `Resuelto`; hay un check para verlos todos.
+- Selector con 3 vistas: **Activos** (default), **Todos**, **Solo resueltos**.
 - Orden: primero vencidos/más próximos por `Fecha límite`, luego los sin fecha
   límite por `Fecha` más antigua.
 - Marca ⚠ los pendientes con 14+ días abiertos sin resolver.
 - "Ver todos combinados" junta los pendientes activos de todos los alumnos
-  guardados.
-- `?sheet=<url-csv>&nombre=<nombre>` en la URL abre directo ese alumno (para
-  compartir un link ya cargado), sin depender de la memoria local.
+  del índice.
+- `?sheet=<url-csv>&nombre=<nombre>` en la URL abre directo un alumno puntual
+  (para compartir un link ya cargado, sin que tenga que estar en el índice).
 
 ## Ver la lista de alumnos en cualquier dispositivo (sin depender de ti)
 
