@@ -19,14 +19,13 @@ Fecha | Pendiente | Contexto | Fecha límite | Estado | Notas
 `Estado` debe ser uno de: `Pendiente`, `En progreso`, `Resuelto`. Cada ronda de
 corrección es una fila nueva; nunca se borra ni se reutiliza una fila.
 
-**Formato de fecha:** las columnas `Fecha` y `Fecha límite` deben ser **texto
-plano**, no celdas de fecha. Cada Sheet es de un alumno distinto y puede tener
-configuración regional distinta; si se deja que Sheets detecte la fecha
-automáticamente, puede interpretarla o reformatearla según ese locale (día/mes
-invertidos) antes de exportar el CSV. Para evitarlo: seleccionar las columnas →
-**Formato → Número → Texto sin formato (Plain text)** → recién ahí escribir
-`AAAA-MM-DD` (ej. `2026-07-15`). Así Sheets guarda la cadena tal cual, sin
-tocarla, sin importar el idioma/región de esa hoja.
+**Formato de fecha:** el alumno escribe la fecha como sea más natural para él,
+no hace falta pedirle que cambie el formato de la celda. Cada Sheet puede tener
+un locale distinto (`dd/mm/aaaa` o `mm/dd/aaaa`), pero el HTML infiere el orden
+solo: si en esa columna algún día pasa de 12, ese slot solo puede ser el día
+(no el mes), y de ahí deduce el orden para toda la columna. Solo en el caso
+ambiguo (ningún valor de la columna pasa de 12, ej. todas las fechas caen en la
+primera mitad del mes) asume `dd/mm/aaaa` por default.
 
 ## Uso
 

@@ -131,14 +131,34 @@ function parseCSV(text) {
   return rows;
 }
 
-function parseDateFlexible(str) {
+// El Sheet de cada alumno puede tener un locale distinto (dd/mm/yyyy vs mm/dd/yyyy);
+// no se le pide al alumno que lo arregle, se infiere del propio dato: si el primer
+// número de alguna fecha de la columna pasa de 12, ese slot solo puede ser el día.
+function detectSlashDateOrder(rawValues) {
+  let firstOver12 = false, secondOver12 = false;
+  for (const v of rawValues) {
+    const m = v && v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) continue;
+    if (+m[1] > 12) firstOver12 = true;
+    if (+m[2] > 12) secondOver12 = true;
+  }
+  if (firstOver12) return 'dmy';
+  if (secondOver12) return 'mdy';
+  return 'dmy'; // ambiguo (todos los valores <=12): default más común en el lab
+}
+
+function parseDateFlexible(str, order) {
   if (!str) return null;
   str = str.trim();
   if (!str) return null;
   let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return new Date(+m[1], +m[2]-1, +m[3]);
   m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return new Date(+m[3], +m[2]-1, +m[1]); // dd/mm/yyyy (locale es-MX)
+  if (m) {
+    return order === 'mdy'
+      ? new Date(+m[3], +m[1]-1, +m[2])
+      : new Date(+m[3], +m[2]-1, +m[1]);
+  }
   const d = new Date(str);
   return isNaN(d) ? null : d;
 }
@@ -158,14 +178,16 @@ async function fetchRecords(alumno, url) {
   const idx = name => headers.indexOf(name);
   const iFecha = idx('Fecha'), iPendiente = idx('Pendiente'), iContexto = idx('Contexto'),
         iLimite = idx('Fecha límite'), iEstado = idx('Estado'), iNotas = idx('Notas');
-  return rows.slice(1).filter(r => r.some(c => c.trim() !== '')).map(r => ({
+  const dataRows = rows.slice(1).filter(r => r.some(c => c.trim() !== ''));
+  const order = detectSlashDateOrder(dataRows.flatMap(r => [r[iFecha], r[iLimite]]));
+  return dataRows.map(r => ({
     alumno,
     fechaRaw: r[iFecha] || '',
-    fecha: parseDateFlexible(r[iFecha]),
+    fecha: parseDateFlexible(r[iFecha], order),
     pendiente: r[iPendiente] || '',
     contexto: r[iContexto] || '',
     fechaLimiteRaw: r[iLimite] || '',
-    fechaLimite: parseDateFlexible(r[iLimite]),
+    fechaLimite: parseDateFlexible(r[iLimite], order),
     estado: (r[iEstado] || '').trim(),
     notas: r[iNotas] || '',
   }));
@@ -344,8 +366,13 @@ if (new URLSearchParams(location.search).get('selftest') === '1') {
     check('parseCSV celda con comillas escapadas y salto de línea', rows[1][2], 'Falta "marco teórico"\ncompleto');
 
     check('fecha ISO', parseDateFlexible('2026-03-15').getTime(), new Date(2026,2,15).getTime());
-    check('fecha dd/mm/yyyy', parseDateFlexible('15/03/2026').getTime(), new Date(2026,2,15).getTime());
     check('fecha vacía', parseDateFlexible(''), null);
+
+    check('orden dd/mm si algún día pasa de 12', detectSlashDateOrder(['15/03/2026', '01/02/2026']), 'dmy');
+    check('orden mm/dd si algún mes-slot pasa de 12', detectSlashDateOrder(['03/15/2026', '01/02/2026']), 'mdy');
+    check('orden ambiguo cae a dmy', detectSlashDateOrder(['03/04/2026']), 'dmy');
+    check('fecha dd/mm/yyyy con orden inferido', parseDateFlexible('15/03/2026', 'dmy').getTime(), new Date(2026,2,15).getTime());
+    check('fecha mm/dd/yyyy con orden inferido', parseDateFlexible('03/15/2026', 'mdy').getTime(), new Date(2026,2,15).getTime());
 
     const recs = [
       { fecha: new Date(2026,0,1), fechaLimite: new Date(2026,5,1) },
@@ -353,8 +380,8 @@ if (new URLSearchParams(location.search).get('selftest') === '1') {
       { fecha: new Date(2026,0,1), fechaLimite: null },
       { fecha: new Date(2025,0,1), fechaLimite: null },
     ];
-    const order = sortRecords(recs).map(r => r.fechaLimite ? +r.fechaLimite : 'sin-fecha:' + r.fecha.getFullYear());
-    check('orden por urgencia', order, [+new Date(2026,1,1), +new Date(2026,5,1), 'sin-fecha:2025', 'sin-fecha:2026']);
+    const orden = sortRecords(recs).map(r => r.fechaLimite ? +r.fechaLimite : 'sin-fecha:' + r.fecha.getFullYear());
+    check('orden por urgencia', orden, [+new Date(2026,1,1), +new Date(2026,5,1), 'sin-fecha:2025', 'sin-fecha:2026']);
 
     const html = results.map(r => `<div style="color:${r.ok?'green':'red'}">${r.ok?'PASS':'FAIL'} — ${r.label}` +
       (r.ok ? '' : ` (esperado ${JSON.stringify(r.want)}, obtuve ${JSON.stringify(r.got)})`) + '</div>').join('');
