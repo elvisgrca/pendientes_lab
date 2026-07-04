@@ -42,20 +42,27 @@ quien lo abre, no hay servidor ni login.
 - `?sheet=<url-csv>&nombre=<nombre>` en la URL abre directo ese alumno (para
   compartir un link ya cargado), sin depender de la memoria local.
 
-## Ver la lista de alumnos en cualquier dispositivo
+## Ver la lista de alumnos en cualquier dispositivo (sin depender de ti)
 
 `localStorage` es por navegador/dispositivo: si agregas un alumno en la laptop,
-no aparece solo en el celular. Dos formas de resolverlo, sin backend:
+no aparece solo en el celular. La solución es un **Sheet índice + Google Form**,
+para que un alumno nuevo se dé de alta sin que tú tengas que estar disponible:
 
-- **Exportar / Importar lista**: copia un texto en un dispositivo y pégalo en
-  el otro (una sola vez). Útil para un traspaso puntual.
-- **Sheet índice (recomendado si son varios dispositivos)**: crea un Google
-  Sheet aparte con columnas `Nombre` y `Link` (un renglón por alumno, con su
-  link CSV ya publicado), publícalo también como CSV, y pon esa URL en la
-  constante `REGISTRY_URL` al inicio del `<script>` de `index.html`. Con eso
-  cualquier dispositivo que abra la página carga sola la lista completa —
-  vos administras el índice editando ese Sheet directamente, el HTML solo lo
-  lee.
+1. Crea un Google Sheet aparte con columnas `Nombre` y `Link`, publícalo como
+   CSV (igual que los demás), y pon esa URL en la constante `REGISTRY_URL` al
+   inicio del `<script>` de `index.html`.
+2. Crea un Google Form con dos preguntas, tituladas exactamente `Nombre` y
+   `Link`, y vincula sus respuestas a ese mismo Sheet (Respuestas → ícono de
+   Sheets). Pon el link del Form en la constante `FORM_URL`.
+3. Comparte el link del Form una vez (ej. en las instrucciones del curso). Un
+   alumno nuevo: publica su propio Sheet como CSV → llena el Form con su
+   nombre y ese link → en la página aparece un botón "¿Eres alumno nuevo?
+   Regístrate aquí" que lleva directo al Form.
+
+Con eso, cualquier dispositivo que abra la página carga sola la lista completa
+al momento — tú no tocas nada, el Form escribe al Sheet y el HTML solo lee. Si
+alguien llena el Form dos veces (ej. corrigiendo un typo), gana la respuesta
+más reciente.
 
 ## Publicar en GitHub Pages
 

@@ -73,9 +73,10 @@
     <div class="chips" id="chips"></div>
     <div class="row" style="margin-top:.8rem">
       <button type="button" class="secondary" id="btnCombinada">Ver todos combinados</button>
-      <button type="button" class="secondary" id="btnExportar">Exportar lista</button>
-      <button type="button" class="secondary" id="btnImportar">Importar lista</button>
       <label class="toggle"><input type="checkbox" id="chkTodos"> Mostrar resueltos</label>
+    </div>
+    <div class="row" id="formLinkRow" style="margin-top:.6rem; display:none">
+      <a id="formLink" href="#" target="_blank" rel="noopener">¿Eres alumno nuevo? Regístrate aquí</a>
     </div>
   </section>
 
@@ -94,6 +95,10 @@ const SOON_DAYS = 3;
 // (un renglón por alumno con su link CSV). Si se define, la lista de alumnos
 // se carga sola en cualquier dispositivo, sin depender de localStorage.
 const REGISTRY_URL = '';
+// Link de un Google Form (preguntas "Nombre" y "Link") cuyas respuestas caen
+// en el Sheet de REGISTRY_URL. Si se define, se muestra un link de autoregistro
+// para que un alumno nuevo se dé de alta sin depender de un humano.
+const FORM_URL = '';
 
 function loadStudents() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
@@ -341,28 +346,6 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
 
 document.getElementById('btnCombinada').addEventListener('click', loadCombined);
 
-document.getElementById('btnExportar').addEventListener('click', () => {
-  if (!students.length) { alert('No hay alumnos guardados en este dispositivo.'); return; }
-  prompt('Copia este texto y pégalo en "Importar lista" en el otro dispositivo:', JSON.stringify(students));
-});
-
-document.getElementById('btnImportar').addEventListener('click', () => {
-  const text = prompt('Pega aquí el texto exportado desde el otro dispositivo:');
-  if (!text) return;
-  let imported;
-  try {
-    imported = JSON.parse(text);
-    if (!Array.isArray(imported) || imported.some(s => !s.nombre || !s.url)) throw new Error('formato inválido');
-  } catch (e) {
-    alert('Ese texto no es una lista válida.');
-    return;
-  }
-  students = mergeStudents(students, imported);
-  saveStudents(students);
-  renderChips();
-  alert(`Lista importada: ${students.length} alumno(s) en total.`);
-});
-
 document.getElementById('chkTodos').addEventListener('change', e => {
   showResolved = e.target.checked;
   if (mode === 'single' && activeName) loadSingle(activeName, students.find(s=>s.nombre===activeName).url);
@@ -379,10 +362,12 @@ async function loadRegistry() {
     if (!rows.length) return;
     const headers = rows[0].map(h => h.trim());
     const iN = headers.indexOf('Nombre'), iL = headers.indexOf('Link');
-    const fromRegistry = rows.slice(1)
+    const rawRegistry = rows.slice(1)
       .filter(r => r.some(c => c.trim() !== ''))
       .map(r => ({ nombre: (r[iN] || '').trim(), url: (r[iL] || '').trim() }))
       .filter(s => s.nombre && s.url);
+    // Si el alumno llenó el Form dos veces (ej. corrigiendo un typo), gana la más reciente.
+    const fromRegistry = Array.from(new Map(rawRegistry.map(s => [s.nombre, s])).values());
     students = mergeStudents(students, fromRegistry);
     saveStudents(students);
   } catch (e) {
@@ -392,6 +377,10 @@ async function loadRegistry() {
 
 // Arranque: soporta ?sheet=<url>&nombre=<nombre> para compartir un link directo.
 (async function init() {
+  if (FORM_URL) {
+    document.getElementById('formLink').href = FORM_URL;
+    document.getElementById('formLinkRow').style.display = '';
+  }
   await loadRegistry();
   renderChips();
   const params = new URLSearchParams(location.search);
