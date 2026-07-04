@@ -252,17 +252,18 @@ function renderRecords(records, opts) {
     }
     return `<tr>
       ${opts.combined ? `<td class="alumno-col">${escapeHtml(r.alumno)}</td>` : ''}
-      <td title="${escapeHtml(r.notas)}">${escapeHtml(r.pendiente)}</td>
+      <td>${escapeHtml(r.pendiente)}</td>
       <td>${escapeHtml(r.contexto)}</td>
       <td>${deadlineHtml}</td>
       <td><span class="badge ${estadoClass(r.estado)}">${escapeHtml(r.estado)}</span></td>
       <td>${escapeHtml(r.fechaRaw)}${staleHtml}</td>
+      <td>${escapeHtml(r.notas)}</td>
     </tr>`;
   }).join('');
   el.innerHTML = `<table>
     <thead><tr>
       ${opts.combined ? '<th>Alumno</th>' : ''}
-      <th>Pendiente</th><th>Contexto</th><th>Fecha límite</th><th>Estado</th><th>Fecha</th>
+      <th>Pendiente</th><th>Contexto</th><th>Fecha límite</th><th>Estado</th><th>Fecha</th><th>Notas</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
