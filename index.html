@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendientes del lab</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f8; --fg: #1b1b1f; --card: #ffffff; --border: #dcdce0;
+    --muted: #6b6b76; --accent: #3457d5;
+    --vencido: #c62828; --pronto: #b8720a; --ok: #2e7d32;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16161a; --fg:#eaeaf0; --card:#1f1f24; --border:#33333a; --muted:#9a9aa5; --accent:#7d9cff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding: 1.2rem 1.5rem 0.5rem; }
+  h1 { font-size: 1.3rem; margin: 0 0 .2rem; }
+  .sub { color: var(--muted); font-size: .85rem; }
+  main { padding: 0 1.5rem 3rem; max-width: 1100px; margin: 0 auto; }
+  .card { background: var(--card); border:1px solid var(--border); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+  .row { display:flex; gap:.5rem; flex-wrap: wrap; align-items:center; }
+  input[type=text], input[type=url] {
+    flex: 1 1 200px; padding:.5rem .6rem; border:1px solid var(--border); border-radius:6px;
+    background: var(--bg); color: var(--fg); font-size:.9rem;
+  }
+  button {
+    padding:.5rem .9rem; border:1px solid var(--border); border-radius:6px; background:var(--accent);
+    color:#fff; cursor:pointer; font-size:.85rem;
+  }
+  button.secondary { background: transparent; color: var(--fg); }
+  button.danger { background:transparent; color:var(--vencido); border-color:var(--vencido); }
+  .chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.6rem; }
+  .chip {
+    display:flex; align-items:center; gap:.4rem; padding:.35rem .3rem .35rem .7rem; border-radius:20px;
+    border:1px solid var(--border); background:var(--bg); cursor:pointer; font-size:.85rem;
+  }
+  .chip.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
+  .chip button { padding: 0 .4rem; font-size: .8rem; background:transparent; color:var(--muted); border:none; }
+  label.toggle { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--muted); cursor:pointer; }
+  table { width:100%; border-collapse: collapse; margin-top: .5rem; }
+  th, td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--border); font-size:.85rem; vertical-align: top; }
+  th { color: var(--muted); font-weight:600; font-size:.75rem; text-transform: uppercase; }
+  tr:last-child td { border-bottom:none; }
+  .badge { display:inline-block; padding:.15rem .5rem; border-radius:12px; font-size:.75rem; font-weight:600; white-space:nowrap; }
+  .badge.pendiente { background:#fdecc8; color:#8a5a00; }
+  .badge.progreso { background:#d6e4ff; color:#1d4ed8; }
+  .badge.resuelto { background:#d9f2d9; color:var(--ok); }
+  .deadline.vencido { color: var(--vencido); font-weight:600; }
+  .deadline.pronto { color: var(--pronto); font-weight:600; }
+  .stale { color: var(--vencido); font-size:.8rem; margin-left:.3rem; }
+  .empty { color:var(--muted); padding: 2rem 0; text-align:center; }
+  .error { color: var(--vencido); font-size: .85rem; }
+  .alumno-col { font-weight:600; }
+  footer { color:var(--muted); font-size:.8rem; text-align:center; padding: 1rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pendientes del lab</h1>
+  <div class="sub">Solo lectura: los cambios de estado se hacen en el Google Sheet de cada alumno.</div>
+</header>
+<main>
+
+  <section class="card">
+    <div class="row">
+      <input id="inNombre" type="text" placeholder="Nombre del alumno">
+      <input id="inUrl" type="url" placeholder="Link CSV publicado del Sheet">
+      <button id="btnAgregar">Agregar y cargar</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="row" style="margin-top:.8rem">
+      <button class="secondary" id="btnCombinada">Ver todos combinados</button>
+      <label class="toggle"><input type="checkbox" id="chkTodos"> Mostrar resueltos</label>
+    </div>
+  </section>
+
+  <section class="card" id="resultado">
+    <div class="empty">Agrega un alumno o selecciona uno de la lista.</div>
+  </section>
+
+</main>
+<footer>GitHub Pages · datos vía CSV publicado de Google Sheets</footer>
+
+<script>
+const LS_KEY = 'pendientesLab.alumnos';
+const STALE_DAYS = 14;
+const SOON_DAYS = 3;
+
+function loadStudents() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+  catch { return []; }
+}
+function saveStudents(list) { localStorage.setItem(LS_KEY, JSON.stringify(list)); }
+
+let students = loadStudents();
+let mode = 'single';       // 'single' | 'combined'
+let activeName = null;     // nombre del alumno activo en modo single
+let showResolved = false;
+const cache = {};          // nombre -> records[]
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Parser CSV mínimo con soporte de comillas (campos con comas/saltos de línea).
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i+1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i+1] === '\n') i++;
+        row.push(field); field = '';
+        if (row.length > 1 || row[0] !== '') rows.push(row);
+        row = [];
+      } else field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function parseDateFlexible(str) {
+  if (!str) return null;
+  str = str.trim();
+  if (!str) return null;
+  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]); // dd/mm/yyyy (locale es-MX)
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+function estadoClass(estado) {
+  const e = (estado || '').trim().toLowerCase();
+  if (e === 'resuelto') return 'resuelto';
+  if (e === 'en progreso') return 'progreso';
+  return 'pendiente';
+}
+
+async function fetchRecords(alumno, url) {
+  const text = await (await fetch(url, { cache: 'no-store' })).text();
+  const rows = parseCSV(text);
+  if (!rows.length) return [];
+  const headers = rows[0].map(h => h.trim());
+  const idx = name => headers.indexOf(name);
+  const iFecha = idx('Fecha'), iPendiente = idx('Pendiente'), iContexto = idx('Contexto'),
+        iLimite = idx('Fecha límite'), iEstado = idx('Estado'), iNotas = idx('Notas');
+  return rows.slice(1).filter(r => r.some(c => c.trim() !== '')).map(r => ({
+    alumno,
+    fechaRaw: r[iFecha] || '',
+    fecha: parseDateFlexible(r[iFecha]),
+    pendiente: r[iPendiente] || '',
+    contexto: r[iContexto] || '',
+    fechaLimiteRaw: r[iLimite] || '',
+    fechaLimite: parseDateFlexible(r[iLimite]),
+    estado: (r[iEstado] || '').trim(),
+    notas: r[iNotas] || '',
+  }));
+}
+
+function sortRecords(records) {
+  return records.slice().sort((a, b) => {
+    const aHas = !!a.fechaLimite, bHas = !!b.fechaLimite;
+    if (aHas && bHas) return a.fechaLimite - b.fechaLimite;
+    if (aHas !== bHas) return aHas ? -1 : 1;
+    return (a.fecha || 0) - (b.fecha || 0);
+  });
+}
+
+function daysBetween(a, b) { return Math.floor((b - a) / 86400000); }
+
+function renderRecords(records, opts) {
+  const el = document.getElementById('resultado');
+  const filtered = records.filter(r => showResolved || r.estado.toLowerCase() !== 'resuelto');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty">Sin pendientes' + (showResolved ? '' : ' activos') + '.</div>';
+    return;
+  }
+  const sorted = sortRecords(filtered);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const rows = sorted.map(r => {
+    let deadlineHtml = '<span style="color:var(--muted)">—</span>';
+    if (r.fechaLimite) {
+      const d = daysBetween(r.fechaLimite, today);
+      const cls = d > 0 ? 'vencido' : (d >= -SOON_DAYS ? 'pronto' : '');
+      const label = d > 0 ? `${r.fechaLimiteRaw} (vencido ${d}d)` : r.fechaLimiteRaw;
+      deadlineHtml = `<span class="deadline ${cls}">${escapeHtml(label)}</span>`;
+    }
+    let staleHtml = '';
+    if (r.estado.toLowerCase() !== 'resuelto' && r.fecha) {
+      const age = daysBetween(r.fecha, today);
+      if (age >= STALE_DAYS) staleHtml = `<span class="stale" title="${age} días sin resolver">⚠ ${age}d</span>`;
+    }
+    return `<tr>
+      ${opts.combined ? `<td class="alumno-col">${escapeHtml(r.alumno)}</td>` : ''}
+      <td title="${escapeHtml(r.notas)}">${escapeHtml(r.pendiente)}</td>
+      <td>${escapeHtml(r.contexto)}</td>
+      <td>${deadlineHtml}</td>
+      <td><span class="badge ${estadoClass(r.estado)}">${escapeHtml(r.estado)}</span></td>
+      <td>${escapeHtml(r.fechaRaw)}${staleHtml}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `<table>
+    <thead><tr>
+      ${opts.combined ? '<th>Alumno</th>' : ''}
+      <th>Pendiente</th><th>Contexto</th><th>Fecha límite</th><th>Estado</th><th>Fecha</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function loadSingle(name, url) {
+  activeName = name; mode = 'single';
+  const el = document.getElementById('resultado');
+  el.innerHTML = '<div class="empty">Cargando…</div>';
+  renderChips();
+  const params = new URLSearchParams(location.search);
+  params.set('sheet', url); params.set('nombre', name);
+  history.replaceState(null, '', location.pathname + '?' + params.toString());
+  try {
+    const records = cache[name] || await fetchRecords(name, url);
+    cache[name] = records;
+    renderRecords(records, { combined: false });
+  } catch (e) {
+    el.innerHTML = `<div class="error">No se pudo cargar el Sheet de ${escapeHtml(name)}: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadCombined() {
+  mode = 'combined'; activeName = null;
+  renderChips();
+  const el = document.getElementById('resultado');
+  el.innerHTML = '<div class="empty">Cargando…</div>';
+  const params = new URLSearchParams(location.search);
+  params.delete('sheet'); params.delete('nombre');
+  history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : ''));
+  if (!students.length) { el.innerHTML = '<div class="empty">No hay alumnos guardados.</div>'; return; }
+  const results = await Promise.allSettled(students.map(s =>
+    cache[s.nombre] ? Promise.resolve(cache[s.nombre]) : fetchRecords(s.nombre, s.url)
+  ));
+  let all = [];
+  const errores = [];
+  results.forEach((res, i) => {
+    if (res.status === 'fulfilled') { cache[students[i].nombre] = res.value; all = all.concat(res.value); }
+    else errores.push(students[i].nombre);
+  });
+  renderRecords(all, { combined: true });
+  if (errores.length) {
+    el.insertAdjacentHTML('afterbegin',
+      `<div class="error">No se pudo cargar: ${errores.map(escapeHtml).join(', ')}</div>`);
+  }
+}
+
+function renderChips() {
+  const chips = document.getElementById('chips');
+  chips.innerHTML = students.map(s => `
+    <span class="chip ${mode==='single' && activeName===s.nombre ? 'active':''}" data-nombre="${escapeHtml(s.nombre)}">
+      ${escapeHtml(s.nombre)}
+      <button class="chip-remove" data-nombre="${escapeHtml(s.nombre)}" title="Quitar de la lista">✕</button>
+    </span>`).join('');
+  chips.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', e => {
+      if (e.target.classList.contains('chip-remove')) return;
+      const s = students.find(x => x.nombre === chip.dataset.nombre);
+      if (s) loadSingle(s.nombre, s.url);
+    });
+  });
+  chips.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      students = students.filter(s => s.nombre !== btn.dataset.nombre);
+      saveStudents(students);
+      delete cache[btn.dataset.nombre];
+      if (activeName === btn.dataset.nombre) {
+        document.getElementById('resultado').innerHTML = '<div class="empty">Agrega un alumno o selecciona uno de la lista.</div>';
+        activeName = null;
+      }
+      renderChips();
+    });
+  });
+}
+
+document.getElementById('btnAgregar').addEventListener('click', () => {
+  const nombre = document.getElementById('inNombre').value.trim();
+  const url = document.getElementById('inUrl').value.trim();
+  if (!nombre || !url) { alert('Falta el nombre o el link CSV.'); return; }
+  students = students.filter(s => s.nombre !== nombre);
+  students.push({ nombre, url });
+  saveStudents(students);
+  document.getElementById('inNombre').value = '';
+  document.getElementById('inUrl').value = '';
+  renderChips();
+  loadSingle(nombre, url);
+});
+
+document.getElementById('btnCombinada').addEventListener('click', loadCombined);
+
+document.getElementById('chkTodos').addEventListener('change', e => {
+  showResolved = e.target.checked;
+  if (mode === 'single' && activeName) loadSingle(activeName, students.find(s=>s.nombre===activeName).url);
+  else if (mode === 'combined') loadCombined();
+});
+
+// Arranque: soporta ?sheet=<url>&nombre=<nombre> para compartir un link directo.
+(function init() {
+  renderChips();
+  const params = new URLSearchParams(location.search);
+  const sheet = params.get('sheet');
+  if (sheet) {
+    const nombre = params.get('nombre') || 'Alumno';
+    document.getElementById('inNombre').value = students.some(s=>s.nombre===nombre) ? '' : nombre;
+    document.getElementById('inUrl').value = students.some(s=>s.nombre===nombre) ? '' : sheet;
+    loadSingle(nombre, sheet);
+  } else if (students.length) {
+    loadCombined();
+  }
+})();
+
+// Autocheck del parser CSV y de fechas: abrir index.html?selftest=1
+if (new URLSearchParams(location.search).get('selftest') === '1') {
+  (function selftest() {
+    const results = [];
+    const check = (label, got, want) => results.push({ label, ok: JSON.stringify(got) === JSON.stringify(want), got, want });
+
+    const csv = 'Fecha,Pendiente,Contexto,Fecha límite,Estado,Notas\n' +
+      '15/03/2026,"Corregir cap. 2, intro","Falta ""marco teórico""\ncompleto",,Pendiente,\n' +
+      '01/01/2026,Revisar figuras,ok,20/01/2026,Resuelto,listo';
+    const rows = parseCSV(csv);
+    check('parseCSV filas', rows.length, 3);
+    check('parseCSV celda con comillas/coma', rows[1][1], 'Corregir cap. 2, intro');
+    check('parseCSV celda con comillas escapadas y salto de línea', rows[1][2], 'Falta "marco teórico"\ncompleto');
+
+    check('fecha ISO', parseDateFlexible('2026-03-15').getTime(), new Date(2026,2,15).getTime());
+    check('fecha dd/mm/yyyy', parseDateFlexible('15/03/2026').getTime(), new Date(2026,2,15).getTime());
+    check('fecha vacía', parseDateFlexible(''), null);
+
+    const recs = [
+      { fecha: new Date(2026,0,1), fechaLimite: new Date(2026,5,1) },
+      { fecha: new Date(2026,0,2), fechaLimite: new Date(2026,1,1) },
+      { fecha: new Date(2026,0,1), fechaLimite: null },
+      { fecha: new Date(2025,0,1), fechaLimite: null },
+    ];
+    const order = sortRecords(recs).map(r => r.fechaLimite ? +r.fechaLimite : 'sin-fecha:' + r.fecha.getFullYear());
+    check('orden por urgencia', order, [+new Date(2026,1,1), +new Date(2026,5,1), 'sin-fecha:2025', 'sin-fecha:2026']);
+
+    const html = results.map(r => `<div style="color:${r.ok?'green':'red'}">${r.ok?'PASS':'FAIL'} — ${r.label}` +
+      (r.ok ? '' : ` (esperado ${JSON.stringify(r.want)}, obtuve ${JSON.stringify(r.got)})`) + '</div>').join('');
+    document.getElementById('resultado').innerHTML = `<h3>Selftest</h3>${html}`;
+    console.log('selftest', results);
+  })();
+}
+</script>
+</body>
+</html>
