@@ -42,6 +42,21 @@ quien lo abre, no hay servidor ni login.
 - `?sheet=<url-csv>&nombre=<nombre>` en la URL abre directo ese alumno (para
   compartir un link ya cargado), sin depender de la memoria local.
 
+## Ver la lista de alumnos en cualquier dispositivo
+
+`localStorage` es por navegador/dispositivo: si agregas un alumno en la laptop,
+no aparece solo en el celular. Dos formas de resolverlo, sin backend:
+
+- **Exportar / Importar lista**: copia un texto en un dispositivo y pégalo en
+  el otro (una sola vez). Útil para un traspaso puntual.
+- **Sheet índice (recomendado si son varios dispositivos)**: crea un Google
+  Sheet aparte con columnas `Nombre` y `Link` (un renglón por alumno, con su
+  link CSV ya publicado), publícalo también como CSV, y pon esa URL en la
+  constante `REGISTRY_URL` al inicio del `<script>` de `index.html`. Con eso
+  cualquier dispositivo que abra la página carga sola la lista completa —
+  vos administras el índice editando ese Sheet directamente, el HTML solo lo
+  lee.
+
 ## Publicar en GitHub Pages
 
 Settings → Pages → Deploy from branch → `main` / `/ (root)`. La URL pública
