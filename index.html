@@ -7,55 +7,75 @@
 <style>
   :root {
     color-scheme: light dark;
-    --bg: #f7f7f8; --fg: #1b1b1f; --card: #ffffff; --border: #dcdce0;
-    --muted: #6b6b76; --accent: #3457d5;
+    --bg: #f4f5f7; --fg: #1b1b1f; --card: #ffffff; --border: #e0e1e6;
+    --muted: #6b6b76; --accent: #3457d5; --accent-soft: #eef1fd;
     --vencido: #c62828; --pronto: #b8720a; --ok: #2e7d32;
+    --shadow: 0 1px 3px rgba(20,20,30,.06), 0 1px 2px rgba(20,20,30,.04);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#16161a; --fg:#eaeaf0; --card:#1f1f24; --border:#33333a; --muted:#9a9aa5; --accent:#7d9cff; }
+    :root {
+      --bg:#131317; --fg:#eaeaf0; --card:#1c1c22; --border:#2c2c34; --muted:#9a9aa5;
+      --accent:#7d9cff; --accent-soft: #232a42; --shadow: 0 1px 3px rgba(0,0,0,.35);
+    }
   }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
-  header { padding: 1.2rem 1.5rem 0.5rem; }
-  h1 { font-size: 1.3rem; margin: 0 0 .2rem; }
+  body {
+    margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background:var(--bg); color:var(--fg); line-height:1.45;
+  }
+  header { padding: 1.6rem 1.5rem .6rem; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .3rem; letter-spacing: -.01em; }
   .sub { color: var(--muted); font-size: .85rem; }
   main { padding: 0 1.5rem 3rem; max-width: 1100px; margin: 0 auto; }
-  .card { background: var(--card); border:1px solid var(--border); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 1.1rem 1.2rem; margin: 1rem 0; box-shadow: var(--shadow); }
   .row { display:flex; gap:.5rem; flex-wrap: wrap; align-items:center; }
   input[type=text], input[type=url], select {
-    flex: 1 1 200px; padding:.5rem .6rem; border:1px solid var(--border); border-radius:6px;
-    background: var(--bg); color: var(--fg); font-size:.9rem;
+    flex: 1 1 200px; padding:.55rem .7rem; border:1px solid var(--border); border-radius:8px;
+    background: var(--bg); color: var(--fg); font-size:.9rem; transition: border-color .15s;
   }
+  input[type=text]:focus, input[type=url]:focus, select:focus { outline: none; border-color: var(--accent); }
   select { flex: 0 0 auto; }
   button {
-    padding:.5rem .9rem; border:1px solid var(--border); border-radius:6px; background:var(--accent);
-    color:#fff; cursor:pointer; font-size:.85rem;
+    padding:.55rem 1rem; border:1px solid var(--accent); border-radius:8px; background:var(--accent);
+    color:#fff; cursor:pointer; font-size:.85rem; font-weight:500; transition: opacity .15s, background .15s;
   }
-  button.secondary { background: transparent; color: var(--fg); }
+  button:hover { opacity:.88; }
+  button.secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+  button.secondary:hover { background: var(--bg); opacity:1; }
   button.danger { background:transparent; color:var(--vencido); border-color:var(--vencido); }
-  .chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.6rem; }
+  .chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.7rem; }
   .chip {
-    display:flex; align-items:center; gap:.4rem; padding:.35rem .3rem .35rem .7rem; border-radius:20px;
-    border:1px solid var(--border); background:var(--bg); cursor:pointer; font-size:.85rem;
+    display:flex; align-items:center; gap:.3rem; padding:.4rem .3rem .4rem .8rem; border-radius:20px;
+    border:1px solid var(--border); background:var(--bg); cursor:pointer; font-size:.85rem; transition: border-color .15s, background .15s;
   }
-  .chip.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
-  .chip button { padding: 0 .4rem; font-size: .8rem; background:transparent; color:var(--muted); border:none; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.active { border-color: var(--accent); background: var(--accent-soft); font-weight:600; }
+  .chip button { padding: 0 .5rem; font-size: .8rem; background:transparent; color:var(--muted); border:none; border-radius:50%; }
+  .chip button:hover { color: var(--vencido); opacity:1; background:transparent; }
   label.toggle { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--muted); cursor:pointer; }
-  table { width:100%; border-collapse: collapse; margin-top: .5rem; }
-  th, td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--border); font-size:.85rem; vertical-align: top; }
-  th { color: var(--muted); font-weight:600; font-size:.75rem; text-transform: uppercase; }
-  tr:last-child td { border-bottom:none; }
-  .badge { display:inline-block; padding:.15rem .5rem; border-radius:12px; font-size:.75rem; font-weight:600; white-space:nowrap; }
+  .table-wrap { overflow-x: auto; margin: .5rem -.2rem 0; padding: 0 .2rem; }
+  table { width:100%; border-collapse: collapse; }
+  th, td { text-align:left; padding:.65rem .7rem; font-size:.85rem; vertical-align: top; white-space: nowrap; }
+  td { white-space: normal; }
+  th {
+    color: var(--muted); font-weight:600; font-size:.72rem; text-transform: uppercase; letter-spacing:.03em;
+    border-bottom:2px solid var(--border); position: sticky; top:0; background: var(--card);
+  }
+  tbody tr { border-bottom:1px solid var(--border); transition: background .1s; }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:nth-child(even) { background: color-mix(in srgb, var(--border) 25%, transparent); }
+  tbody tr:hover { background: var(--accent-soft); }
+  .badge { display:inline-block; padding:.2rem .55rem; border-radius:12px; font-size:.72rem; font-weight:600; white-space:nowrap; }
   .badge.pendiente { background:#fdecc8; color:#8a5a00; }
   .badge.progreso { background:#d6e4ff; color:#1d4ed8; }
-  .badge.resuelto { background:#d9f2d9; color:var(--ok); }
+  .badge.resuelto { background:#d9f2d9; color:#256029; }
   .deadline.vencido { color: var(--vencido); font-weight:600; }
   .deadline.pronto { color: var(--pronto); font-weight:600; }
-  .stale { color: var(--vencido); font-size:.8rem; margin-left:.3rem; }
-  .empty { color:var(--muted); padding: 2rem 0; text-align:center; }
-  .error { color: var(--vencido); font-size: .85rem; }
+  .stale { color: var(--vencido); font-size:.8rem; margin-left:.3rem; white-space: nowrap; }
+  .empty { color:var(--muted); padding: 2.5rem 0; text-align:center; font-size:.9rem; }
+  .error { color: var(--vencido); font-size: .85rem; padding: .6rem 0; }
   .alumno-col { font-weight:600; }
-  footer { color:var(--muted); font-size:.8rem; text-align:center; padding: 1rem; }
+  footer { color:var(--muted); font-size:.8rem; text-align:center; padding: 1.5rem 1rem; }
 </style>
 </head>
 <body>
@@ -260,13 +280,13 @@ function renderRecords(records, opts) {
       <td>${escapeHtml(r.notas)}</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<table>
+  el.innerHTML = `<div class="table-wrap"><table>
     <thead><tr>
       ${opts.combined ? '<th>Alumno</th>' : ''}
       <th>Pendiente</th><th>Contexto</th><th>Fecha límite</th><th>Estado</th><th>Fecha</th><th>Notas</th>
     </tr></thead>
     <tbody>${rows}</tbody>
-  </table>`;
+  </table></div>`;
 }
 
 async function loadSingle(name, url) {
