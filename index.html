@@ -42,6 +42,7 @@
   button:hover { opacity:.88; }
   button.secondary { background: transparent; color: var(--fg); border-color: var(--border); }
   button.secondary:hover { background: var(--bg); opacity:1; }
+  button.filtro.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
   button.danger { background:transparent; color:var(--vencido); border-color:var(--vencido); }
   .chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.7rem; }
   .chip {
@@ -89,11 +90,11 @@
     <div class="chips" id="chips"></div>
     <div class="row" style="margin-top:.8rem">
       <button type="button" class="secondary" id="btnCombinada">Ver todos combinados</button>
-      <select id="selEstado">
-        <option value="activos">Activos</option>
-        <option value="todos">Todos</option>
-        <option value="resueltos">Solo resueltos</option>
-      </select>
+    </div>
+    <div class="row" style="margin-top:.6rem" id="filtroEstado">
+      <button type="button" class="secondary filtro active" data-filtro="activos">Activos</button>
+      <button type="button" class="secondary filtro" data-filtro="todos">Todos</button>
+      <button type="button" class="secondary filtro" data-filtro="resueltos">Solo resueltos</button>
     </div>
   </section>
 
@@ -357,10 +358,13 @@ function renderChips() {
 
 document.getElementById('btnCombinada').addEventListener('click', loadCombined);
 
-document.getElementById('selEstado').addEventListener('change', e => {
-  estadoFiltro = e.target.value;
-  if (mode === 'single' && activeName) loadSingle(activeName, students.find(s=>s.nombre===activeName).url);
-  else if (mode === 'combined') loadCombined();
+document.querySelectorAll('#filtroEstado .filtro').forEach(btn => {
+  btn.addEventListener('click', () => {
+    estadoFiltro = btn.dataset.filtro;
+    document.querySelectorAll('#filtroEstado .filtro').forEach(b => b.classList.toggle('active', b === btn));
+    if (mode === 'single' && activeName) loadSingle(activeName, students.find(s=>s.nombre===activeName).url);
+    else if (mode === 'combined') loadCombined();
+  });
 });
 
 // Trae el Sheet índice (Nombre,Link) si está configurado, para que cualquier
