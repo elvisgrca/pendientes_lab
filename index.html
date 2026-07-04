@@ -22,10 +22,11 @@
   main { padding: 0 1.5rem 3rem; max-width: 1100px; margin: 0 auto; }
   .card { background: var(--card); border:1px solid var(--border); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
   .row { display:flex; gap:.5rem; flex-wrap: wrap; align-items:center; }
-  input[type=text], input[type=url] {
+  input[type=text], input[type=url], select {
     flex: 1 1 200px; padding:.5rem .6rem; border:1px solid var(--border); border-radius:6px;
     background: var(--bg); color: var(--fg); font-size:.9rem;
   }
+  select { flex: 0 0 auto; }
   button {
     padding:.5rem .9rem; border:1px solid var(--border); border-radius:6px; background:var(--accent);
     color:#fff; cursor:pointer; font-size:.85rem;
@@ -73,7 +74,11 @@
     <div class="chips" id="chips"></div>
     <div class="row" style="margin-top:.8rem">
       <button type="button" class="secondary" id="btnCombinada">Ver todos combinados</button>
-      <label class="toggle"><input type="checkbox" id="chkTodos"> Mostrar resueltos</label>
+      <select id="selEstado">
+        <option value="activos">Activos</option>
+        <option value="todos">Todos</option>
+        <option value="resueltos">Solo resueltos</option>
+      </select>
     </div>
   </section>
 
@@ -107,7 +112,7 @@ function mergeStudents(existing, imported) {
 let students = loadStudents();
 let mode = 'single';       // 'single' | 'combined'
 let activeName = null;     // nombre del alumno activo en modo single
-let showResolved = false;
+let estadoFiltro = 'activos'; // 'activos' | 'todos' | 'resueltos'
 const cache = {};          // nombre -> records[]
 
 function escapeHtml(s) {
@@ -213,11 +218,21 @@ function sortRecords(records) {
 
 function daysBetween(a, b) { return Math.floor((b - a) / 86400000); }
 
+function filterByEstado(records, filtro) {
+  return records.filter(r => {
+    const resuelto = r.estado.toLowerCase() === 'resuelto';
+    if (filtro === 'resueltos') return resuelto;
+    if (filtro === 'todos') return true;
+    return !resuelto;
+  });
+}
+
 function renderRecords(records, opts) {
   const el = document.getElementById('resultado');
-  const filtered = records.filter(r => showResolved || r.estado.toLowerCase() !== 'resuelto');
+  const filtered = filterByEstado(records, estadoFiltro);
   if (!filtered.length) {
-    el.innerHTML = '<div class="empty">Sin pendientes' + (showResolved ? '' : ' activos') + '.</div>';
+    const msg = estadoFiltro === 'resueltos' ? ' resueltos' : estadoFiltro === 'todos' ? '' : ' activos';
+    el.innerHTML = '<div class="empty">Sin pendientes' + msg + '.</div>';
     return;
   }
   const sorted = sortRecords(filtered);
@@ -339,8 +354,8 @@ document.getElementById('btnAgregar').addEventListener('click', () => {
 
 document.getElementById('btnCombinada').addEventListener('click', loadCombined);
 
-document.getElementById('chkTodos').addEventListener('change', e => {
-  showResolved = e.target.checked;
+document.getElementById('selEstado').addEventListener('change', e => {
+  estadoFiltro = e.target.value;
   if (mode === 'single' && activeName) loadSingle(activeName, students.find(s=>s.nombre===activeName).url);
   else if (mode === 'combined') loadCombined();
 });
@@ -422,6 +437,11 @@ if (new URLSearchParams(location.search).get('selftest') === '1') {
       [{nombre:'Ana', url:'urlnueva'}]
     );
     check('importar reemplaza por nombre y conserva el resto', mergido, [{nombre:'Beto', url:'urlbeto'}, {nombre:'Ana', url:'urlnueva'}]);
+
+    const estados = [{estado:'Pendiente'}, {estado:'En progreso'}, {estado:'Resuelto'}];
+    check('filtro activos oculta resueltos', filterByEstado(estados,'activos').map(r=>r.estado), ['Pendiente','En progreso']);
+    check('filtro todos muestra todo', filterByEstado(estados,'todos').map(r=>r.estado), ['Pendiente','En progreso','Resuelto']);
+    check('filtro solo resueltos', filterByEstado(estados,'resueltos').map(r=>r.estado), ['Resuelto']);
 
     const html = results.map(r => `<div style="color:${r.ok?'green':'red'}">${r.ok?'PASS':'FAIL'} — ${r.label}` +
       (r.ok ? '' : ` (esperado ${JSON.stringify(r.want)}, obtuve ${JSON.stringify(r.got)})`) + '</div>').join('');
