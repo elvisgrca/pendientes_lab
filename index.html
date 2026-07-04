@@ -280,6 +280,7 @@ function renderChips() {
   });
   chips.querySelectorAll('.chip-remove').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (!confirm(`¿Quitar a ${btn.dataset.nombre} de la lista guardada? (no borra su Sheet, solo la memoria de este navegador)`)) return;
       students = students.filter(s => s.nombre !== btn.dataset.nombre);
       saveStudents(students);
       delete cache[btn.dataset.nombre];
