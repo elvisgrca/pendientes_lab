@@ -75,9 +75,6 @@
       <button type="button" class="secondary" id="btnCombinada">Ver todos combinados</button>
       <label class="toggle"><input type="checkbox" id="chkTodos"> Mostrar resueltos</label>
     </div>
-    <div class="row" id="formLinkRow" style="margin-top:.6rem; display:none">
-      <a id="formLink" href="#" target="_blank" rel="noopener">¿Eres alumno nuevo? Regístrate aquí</a>
-    </div>
   </section>
 
   <section class="card" id="resultado">
@@ -95,10 +92,6 @@ const SOON_DAYS = 3;
 // (un renglón por alumno con su link CSV). Si se define, la lista de alumnos
 // se carga sola en cualquier dispositivo, sin depender de localStorage.
 const REGISTRY_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNmjXf6tXtL0jy9fSjKJX0-n_yZz3S6hMc28BzkcQOb4BJ-AotGWq5WOPpw1ZcEtGlv91bLwPwCChw/pub?gid=671840515&single=true&output=csv';
-// Link de un Google Form (preguntas "Nombre" y "Link") cuyas respuestas caen
-// en el Sheet de REGISTRY_URL. Si se define, se muestra un link de autoregistro
-// para que un alumno nuevo se dé de alta sin depender de un humano.
-const FORM_URL = '';
 
 function loadStudents() {
   try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
@@ -377,13 +370,10 @@ async function loadRegistry() {
 
 // Arranque: soporta ?sheet=<url>&nombre=<nombre> para compartir un link directo.
 (async function init() {
-  if (FORM_URL) {
-    document.getElementById('formLink').href = FORM_URL;
-    document.getElementById('formLinkRow').style.display = '';
-  }
+  const params = new URLSearchParams(location.search);
+  if (params.get('selftest') === '1') return; // no disparar red durante el autocheck
   await loadRegistry();
   renderChips();
-  const params = new URLSearchParams(location.search);
   const sheet = params.get('sheet');
   if (sheet) {
     const nombre = params.get('nombre') || 'Alumno';

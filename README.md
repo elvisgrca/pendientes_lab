@@ -48,21 +48,23 @@ quien lo abre, no hay servidor ni login.
 no aparece solo en el celular. La solución es un **Sheet índice + Google Form**,
 para que un alumno nuevo se dé de alta sin que tú tengas que estar disponible:
 
-1. Crea un Google Sheet aparte con columnas `Nombre` y `Link`, publícalo como
-   CSV (igual que los demás), y pon esa URL en la constante `REGISTRY_URL` al
-   inicio del `<script>` de `index.html`.
-2. Crea un Google Form con dos preguntas, tituladas exactamente `Nombre` y
-   `Link`, y vincula sus respuestas a ese mismo Sheet (Respuestas → ícono de
-   Sheets). Pon el link del Form en la constante `FORM_URL`.
-3. Comparte el link del Form una vez (ej. en las instrucciones del curso). Un
-   alumno nuevo: publica su propio Sheet como CSV → llena el Form con su
-   nombre y ese link → en la página aparece un botón "¿Eres alumno nuevo?
-   Regístrate aquí" que lleva directo al Form.
+1. Crea un Google Form con dos preguntas de respuesta corta, tituladas
+   exactamente `Nombre` y `Link`. En Respuestas → ícono de Sheets, deja que
+   cree la hoja de respuestas — esa hoja ya es tu índice, no hace falta crear
+   una aparte.
+2. Publica esa hoja como CSV (Archivo → Compartir → Publicar en la web →
+   CSV) y pon esa URL en la constante `REGISTRY_URL` al inicio del `<script>`
+   de `index.html`.
+3. Comparte el link del Form (el de "Enviar" → 🔗, no el de edición)
+   directamente con tus compañeros, por el canal que ya uses con ellos —
+   WhatsApp, correo, etc. No hace falta ponerlo en esta página: el dashboard
+   es para tu asesora, tus compañeros nunca necesitan abrirlo.
 
-Con eso, cualquier dispositivo que abra la página carga sola la lista completa
-al momento — tú no tocas nada, el Form escribe al Sheet y el HTML solo lee. Si
-alguien llena el Form dos veces (ej. corrigiendo un typo), gana la respuesta
-más reciente.
+Un alumno nuevo: publica su propio Sheet como CSV → llena el Form con su
+nombre y ese link. Cualquier dispositivo que abra el dashboard después carga
+sola la lista completa — nadie toca nada más, el Form escribe al Sheet y el
+HTML solo lee. Si alguien llena el Form dos veces (ej. corrigiendo un typo),
+gana la respuesta más reciente.
 
 ## Publicar en GitHub Pages
 
