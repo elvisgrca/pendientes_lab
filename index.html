@@ -29,21 +29,16 @@
   main { padding: 0 1.5rem 3rem; max-width: 1100px; margin: 0 auto; }
   .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 1.1rem 1.2rem; margin: 1rem 0; box-shadow: var(--shadow); }
   .row { display:flex; gap:.5rem; flex-wrap: wrap; align-items:center; }
-  input[type=text], input[type=url], select {
-    flex: 1 1 200px; padding:.55rem .7rem; border:1px solid var(--border); border-radius:8px;
-    background: var(--bg); color: var(--fg); font-size:.9rem; transition: border-color .15s;
-  }
-  input[type=text]:focus, input[type=url]:focus, select:focus { outline: none; border-color: var(--accent); }
-  select { flex: 0 0 auto; }
   button {
     padding:.55rem 1rem; border:1px solid var(--accent); border-radius:8px; background:var(--accent);
     color:#fff; cursor:pointer; font-size:.85rem; font-weight:500; transition: opacity .15s, background .15s;
   }
   button:hover { opacity:.88; }
+  button:disabled { opacity:.5; cursor:default; }
   button.secondary { background: transparent; color: var(--fg); border-color: var(--border); }
   button.secondary:hover { background: var(--bg); opacity:1; }
   button.filtro.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
-  button.danger { background:transparent; color:var(--vencido); border-color:var(--vencido); }
+  button.small { padding:.3rem .6rem; font-size:.78rem; }
   .chips { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.7rem; }
   .chip {
     display:flex; align-items:center; gap:.3rem; padding:.4rem .3rem .4rem .8rem; border-radius:20px;
@@ -51,9 +46,11 @@
   }
   .chip:hover { border-color: var(--accent); }
   .chip.active { border-color: var(--accent); background: var(--accent-soft); font-weight:600; }
+  .chip .count { color: var(--muted); font-weight:400; }
   .chip button { padding: 0 .5rem; font-size: .8rem; background:transparent; color:var(--muted); border:none; border-radius:50%; }
   .chip button:hover { color: var(--vencido); opacity:1; background:transparent; }
-  label.toggle { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--muted); cursor:pointer; }
+  details.ocultos { font-size: .8rem; color: var(--muted); margin-top: .8rem; }
+  details.ocultos summary { cursor: pointer; }
   .table-wrap { overflow-x: auto; margin: .5rem -.2rem 0; padding: 0 .2rem; }
   table { width:100%; border-collapse: collapse; }
   th, td { text-align:left; padding:.65rem .7rem; font-size:.85rem; vertical-align: top; white-space: nowrap; }
@@ -82,16 +79,14 @@
 <body>
 <header>
   <h1>Pendientes del lab</h1>
-  <div class="sub">Solo lectura: los cambios de estado se hacen en el Google Sheet de cada alumno.</div>
+  <div class="sub">Los alumnos registran sus pendientes por Google Forms. Usa el botón de cada fila para marcarlos como resueltos.</div>
 </header>
 <main>
 
   <section class="card">
     <div class="chips" id="chips"></div>
-    <div class="row" style="margin-top:.8rem">
-      <button type="button" class="secondary" id="btnCombinada">Ver todos combinados</button>
-    </div>
-    <div class="row" style="margin-top:.6rem" id="filtroEstado">
+    <div id="ocultosPanel"></div>
+    <div class="row" style="margin-top:.8rem" id="filtroEstado">
       <button type="button" class="secondary filtro active" data-filtro="activos">Activos</button>
       <button type="button" class="secondary filtro" data-filtro="todos">Todos</button>
       <button type="button" class="secondary filtro" data-filtro="resueltos">Solo resueltos</button>
@@ -99,40 +94,35 @@
   </section>
 
   <section class="card" id="resultado">
-    <div class="empty">Agrega un alumno o selecciona uno de la lista.</div>
+    <div class="empty">Cargando…</div>
   </section>
 
 </main>
 <footer>GitHub Pages · datos vía CSV publicado de Google Sheets</footer>
 
 <script>
-const LS_KEY = 'pendientesLab.alumnos';
 const STALE_DAYS = 14;
 const SOON_DAYS = 3;
-// Link CSV publicado de un Sheet "índice" opcional con columnas Nombre,Link
-// (un renglón por alumno con su link CSV). Si se define, la lista de alumnos
-// se carga sola en cualquier dispositivo, sin depender de localStorage.
-const REGISTRY_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNmjXf6tXtL0jy9fSjKJX0-n_yZz3S6hMc28BzkcQOb4BJ-AotGWq5WOPpw1ZcEtGlv91bLwPwCChw/pub?gid=671840515&single=true&output=csv';
+// Sheet único de respuestas del Form (Marca temporal, Alumno, Pendiente, Contexto,
+// Fecha límite, Notas, Estado). Estado se agrega a mano, vacío = Pendiente.
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRnQUcegN1pFjboILWJKc_TVzYvRamxpEHsucEpXuTxGo6jwuVhmIi4O-QMeXqBM9_TkB2tznnZdFIe/pub?gid=730028715&single=true&output=csv';
+// Pestaña "AlumnosOcultos" (columna Alumno) del mismo Sheet.
+const OCULTOS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRnQUcegN1pFjboILWJKc_TVzYvRamxpEHsucEpXuTxGo6jwuVhmIi4O-QMeXqBM9_TkB2tznnZdFIe/pub?gid=879364831&single=true&output=csv';
+// Apps Script Web App: marca resuelto / oculta / muestra un alumno.
+const APPSCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4ep65ye_htfoUZG_3t9fvzUL74rFedE6H90seL-l579Smv9PQHtEGMPEBywIscW4/exec';
 
-function loadStudents() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
-  catch { return []; }
-}
-function saveStudents(list) { localStorage.setItem(LS_KEY, JSON.stringify(list)); }
-
-// La lista importada gana sobre entradas existentes con el mismo nombre.
-function mergeStudents(existing, imported) {
-  return existing.filter(s => !imported.some(i => i.nombre === s.nombre)).concat(imported);
-}
-
-let students = loadStudents();
-let mode = 'single';       // 'single' | 'combined'
-let activeName = null;     // nombre del alumno activo en modo single
+let allRecords = [];
+let ocultos = new Set();
+let alumnoFiltro = null;      // null = todos
 let estadoFiltro = 'activos'; // 'activos' | 'todos' | 'resueltos'
-const cache = {};          // nombre -> records[]
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Distintos alumnos pueden escribir su nombre con espacios de más; se agrupan igual.
+function normalizeAlumno(s) {
+  return (s || '').trim().replace(/\s+/g, ' ');
 }
 
 // Parser CSV mínimo con soporte de comillas (campos con comas/saltos de línea).
@@ -161,13 +151,18 @@ function parseCSV(text) {
   return rows;
 }
 
-// El Sheet de cada alumno puede tener un locale distinto (dd/mm/yyyy vs mm/dd/yyyy);
-// no se le pide al alumno que lo arregle, se infiere del propio dato: si el primer
-// número de alguna fecha de la columna pasa de 12, ese slot solo puede ser el día.
+// Marca temporal viene con hora ("3/7/2026 21:01:19"); solo nos importa el día.
+function stripTime(s) {
+  return s.replace(/\s+\d{1,2}:\d{2}(:\d{2})?\s*$/, '');
+}
+
+// El Sheet puede tener un locale distinto (dd/mm/yyyy vs mm/dd/yyyy); se infiere
+// del propio dato: si el primer número de alguna fecha pasa de 12, ese slot solo
+// puede ser el día.
 function detectSlashDateOrder(rawValues) {
   let firstOver12 = false, secondOver12 = false;
   for (const v of rawValues) {
-    const m = v && v.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const m = v && stripTime(v.trim()).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (!m) continue;
     if (+m[1] > 12) firstOver12 = true;
     if (+m[2] > 12) secondOver12 = true;
@@ -179,7 +174,7 @@ function detectSlashDateOrder(rawValues) {
 
 function parseDateFlexible(str, order) {
   if (!str) return null;
-  str = str.trim();
+  str = stripTime(str.trim());
   if (!str) return null;
   let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return new Date(+m[1], +m[2]-1, +m[3]);
@@ -200,20 +195,20 @@ function estadoClass(estado) {
   return 'pendiente';
 }
 
-async function fetchRecords(alumno, url) {
-  const text = await (await fetch(url, { cache: 'no-store' })).text();
+async function fetchPendientes() {
+  const text = await (await fetch(SHEET_URL, { cache: 'no-store' })).text();
   const rows = parseCSV(text);
   if (!rows.length) return [];
   const headers = rows[0].map(h => h.trim());
   const idx = name => headers.indexOf(name);
-  const iFecha = idx('Fecha'), iPendiente = idx('Pendiente'), iContexto = idx('Contexto'),
-        iLimite = idx('Fecha límite'), iEstado = idx('Estado'), iNotas = idx('Notas');
+  const iTS = idx('Marca temporal'), iAlumno = idx('Alumno'), iPendiente = idx('Pendiente'),
+        iContexto = idx('Contexto'), iLimite = idx('Fecha límite'), iNotas = idx('Notas'), iEstado = idx('Estado');
   const dataRows = rows.slice(1).filter(r => r.some(c => c.trim() !== ''));
-  const order = detectSlashDateOrder(dataRows.flatMap(r => [r[iFecha], r[iLimite]]));
+  const order = detectSlashDateOrder(dataRows.flatMap(r => [r[iTS], r[iLimite]]));
   return dataRows.map(r => ({
-    alumno,
-    fechaRaw: r[iFecha] || '',
-    fecha: parseDateFlexible(r[iFecha], order),
+    ts: (r[iTS] || '').trim(),
+    alumno: normalizeAlumno(r[iAlumno]),
+    fecha: parseDateFlexible(r[iTS], order),
     pendiente: r[iPendiente] || '',
     contexto: r[iContexto] || '',
     fechaLimiteRaw: r[iLimite] || '',
@@ -221,6 +216,17 @@ async function fetchRecords(alumno, url) {
     estado: (r[iEstado] || '').trim(),
     notas: r[iNotas] || '',
   }));
+}
+
+async function fetchOcultos() {
+  const text = await (await fetch(OCULTOS_URL, { cache: 'no-store' })).text();
+  const rows = parseCSV(text);
+  if (!rows.length) return [];
+  const headers = rows[0].map(h => h.trim());
+  const iAlumno = headers.indexOf('Alumno');
+  return rows.slice(1)
+    .map(r => normalizeAlumno(r[iAlumno]))
+    .filter(Boolean);
 }
 
 function sortRecords(records) {
@@ -243,14 +249,52 @@ function filterByEstado(records, filtro) {
   });
 }
 
-function renderRecords(records, opts) {
+async function llamarAppScript(params) {
+  const res = await fetch(APPSCRIPT_URL, { method: 'POST', body: new URLSearchParams(params) });
+  return res.json();
+}
+
+async function marcarResuelto(ts, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Marcando…';
+  try {
+    const data = await llamarAppScript({ accion: 'resolver', ts });
+    if (!data.ok) { alert('No se pudo marcar: ' + (data.error || 'error desconocido')); btn.disabled = false; btn.textContent = 'Marcar resuelto'; return; }
+    await cargarTodo();
+  } catch (e) {
+    alert('Error de red: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Marcar resuelto';
+  }
+}
+
+async function ocultarAlumno(alumno) {
+  if (!confirm(`¿Ocultar a ${alumno} de la vista? Sus registros no se borran, solo se dejan de mostrar; puedes volver a mostrarlo después.`)) return;
+  try {
+    const data = await llamarAppScript({ accion: 'ocultar', alumno });
+    if (!data.ok) { alert('No se pudo ocultar: ' + (data.error || 'error desconocido')); return; }
+    await cargarTodo();
+  } catch (e) { alert('Error de red: ' + e.message); }
+}
+
+async function mostrarAlumno(alumno) {
+  try {
+    const data = await llamarAppScript({ accion: 'mostrar', alumno });
+    if (!data.ok) { alert('No se pudo mostrar: ' + (data.error || 'error desconocido')); return; }
+    await cargarTodo();
+  } catch (e) { alert('Error de red: ' + e.message); }
+}
+
+function renderTabla() {
   const el = document.getElementById('resultado');
+  let records = allRecords.filter(r => !ocultos.has(r.alumno));
+  if (alumnoFiltro) records = records.filter(r => r.alumno === alumnoFiltro);
   const filtered = filterByEstado(records, estadoFiltro);
   if (!filtered.length) {
     const msg = estadoFiltro === 'resueltos' ? ' resueltos' : estadoFiltro === 'todos' ? '' : ' activos';
     el.innerHTML = '<div class="empty">Sin pendientes' + msg + '.</div>';
     return;
   }
+  const combined = !alumnoFiltro;
   const sorted = sortRecords(filtered);
   const today = new Date(); today.setHours(0,0,0,0);
   const rows = sorted.map(r => {
@@ -262,147 +306,102 @@ function renderRecords(records, opts) {
       deadlineHtml = `<span class="deadline ${cls}">${escapeHtml(label)}</span>`;
     }
     let staleHtml = '';
-    if (r.estado.toLowerCase() !== 'resuelto' && r.fecha) {
+    const resuelto = r.estado.toLowerCase() === 'resuelto';
+    if (!resuelto && r.fecha) {
       const age = daysBetween(r.fecha, today);
       if (age >= STALE_DAYS) staleHtml = `<span class="stale" title="${age} días sin resolver">⚠ ${age}d</span>`;
     }
+    const accion = resuelto ? '' : `<button type="button" class="small btn-resolver" data-ts="${escapeHtml(r.ts)}">Marcar resuelto</button>`;
     return `<tr>
-      ${opts.combined ? `<td class="alumno-col">${escapeHtml(r.alumno)}</td>` : ''}
+      ${combined ? `<td class="alumno-col">${escapeHtml(r.alumno)}</td>` : ''}
       <td>${escapeHtml(r.pendiente)}</td>
       <td>${escapeHtml(r.contexto)}</td>
       <td>${deadlineHtml}</td>
       <td><span class="badge ${estadoClass(r.estado)}">${escapeHtml(r.estado)}</span></td>
-      <td>${escapeHtml(r.fechaRaw)}${staleHtml}</td>
+      <td>${escapeHtml(r.ts)}${staleHtml}</td>
       <td>${escapeHtml(r.notas)}</td>
+      <td>${accion}</td>
     </tr>`;
   }).join('');
   el.innerHTML = `<div class="table-wrap"><table>
     <thead><tr>
-      ${opts.combined ? '<th>Alumno</th>' : ''}
-      <th>Pendiente</th><th>Contexto</th><th>Fecha límite</th><th>Estado</th><th>Fecha</th><th>Notas</th>
+      ${combined ? '<th>Alumno</th>' : ''}
+      <th>Pendiente</th><th>Contexto</th><th>Fecha límite</th><th>Estado</th><th>Fecha</th><th>Notas</th><th>Acciones</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
 
-async function loadSingle(name, url) {
-  activeName = name; mode = 'single';
-  const el = document.getElementById('resultado');
-  el.innerHTML = '<div class="empty">Cargando…</div>';
-  renderChips();
-  const params = new URLSearchParams(location.search);
-  params.set('sheet', url); params.set('nombre', name);
-  history.replaceState(null, '', location.pathname + '?' + params.toString());
-  try {
-    const records = cache[name] || await fetchRecords(name, url);
-    cache[name] = records;
-    renderRecords(records, { combined: false });
-  } catch (e) {
-    el.innerHTML = `<div class="error">No se pudo cargar el Sheet de ${escapeHtml(name)}: ${escapeHtml(e.message)}</div>`;
-  }
-}
-
-async function loadCombined() {
-  mode = 'combined'; activeName = null;
-  renderChips();
-  const el = document.getElementById('resultado');
-  el.innerHTML = '<div class="empty">Cargando…</div>';
-  const params = new URLSearchParams(location.search);
-  params.delete('sheet'); params.delete('nombre');
-  history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params.toString() : ''));
-  if (!students.length) { el.innerHTML = '<div class="empty">No hay alumnos guardados.</div>'; return; }
-  const results = await Promise.allSettled(students.map(s =>
-    cache[s.nombre] ? Promise.resolve(cache[s.nombre]) : fetchRecords(s.nombre, s.url)
-  ));
-  let all = [];
-  const errores = [];
-  results.forEach((res, i) => {
-    if (res.status === 'fulfilled') { cache[students[i].nombre] = res.value; all = all.concat(res.value); }
-    else errores.push(students[i].nombre);
-  });
-  renderRecords(all, { combined: true });
-  if (errores.length) {
-    el.insertAdjacentHTML('afterbegin',
-      `<div class="error">No se pudo cargar: ${errores.map(escapeHtml).join(', ')}</div>`);
-  }
-}
-
 function renderChips() {
   const chips = document.getElementById('chips');
-  chips.innerHTML = students.map(s => `
-    <span class="chip ${mode==='single' && activeName===s.nombre ? 'active':''}" data-nombre="${escapeHtml(s.nombre)}">
-      ${escapeHtml(s.nombre)}
-      <button class="chip-remove" data-nombre="${escapeHtml(s.nombre)}" title="Quitar de la lista">✕</button>
-    </span>`).join('');
-  chips.querySelectorAll('.chip').forEach(chip => {
-    chip.addEventListener('click', e => {
-      if (e.target.classList.contains('chip-remove')) return;
-      const s = students.find(x => x.nombre === chip.dataset.nombre);
-      if (s) loadSingle(s.nombre, s.url);
-    });
+  const counts = {};
+  allRecords.forEach(r => {
+    if (ocultos.has(r.alumno)) return;
+    counts[r.alumno] = (counts[r.alumno] || 0) + 1;
   });
-  chips.querySelectorAll('.chip-remove').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!confirm(`¿Quitar a ${btn.dataset.nombre} de la lista guardada? (no borra su Sheet, solo la memoria de este navegador)`)) return;
-      students = students.filter(s => s.nombre !== btn.dataset.nombre);
-      saveStudents(students);
-      delete cache[btn.dataset.nombre];
-      if (activeName === btn.dataset.nombre) {
-        document.getElementById('resultado').innerHTML = '<div class="empty">Agrega un alumno o selecciona uno de la lista.</div>';
-        activeName = null;
-      }
-      renderChips();
-    });
-  });
+  const nombres = Object.keys(counts).sort((a, b) => a.localeCompare(b));
+  const todosActive = alumnoFiltro === null;
+  chips.innerHTML = `<span class="chip ${todosActive ? 'active' : ''}" data-alumno="">Todos</span>` +
+    nombres.map(n => `
+      <span class="chip ${alumnoFiltro === n ? 'active' : ''}" data-alumno="${escapeHtml(n)}">
+        ${escapeHtml(n)} <span class="count">${counts[n]}</span>
+        <button class="chip-remove" data-alumno="${escapeHtml(n)}" title="Ocultar alumno">✕</button>
+      </span>`).join('');
+
+  const panel = document.getElementById('ocultosPanel');
+  if (!ocultos.size) { panel.innerHTML = ''; }
+  else {
+    panel.innerHTML = `<details class="ocultos"><summary>${ocultos.size} alumno(s) oculto(s)</summary>
+      <div class="chips">
+        ${Array.from(ocultos).sort().map(n => `
+          <span class="chip">${escapeHtml(n)}
+            <button class="btn-mostrar" data-alumno="${escapeHtml(n)}" title="Mostrar de nuevo">↩</button>
+          </span>`).join('')}
+      </div>
+    </details>`;
+  }
 }
 
-document.getElementById('btnCombinada').addEventListener('click', loadCombined);
+document.body.addEventListener('click', e => {
+  const chipRemove = e.target.closest('.chip-remove');
+  if (chipRemove) { ocultarAlumno(chipRemove.dataset.alumno); return; }
+  const btnResolver = e.target.closest('.btn-resolver');
+  if (btnResolver) { marcarResuelto(btnResolver.dataset.ts, btnResolver); return; }
+  const btnMostrar = e.target.closest('.btn-mostrar');
+  if (btnMostrar) { mostrarAlumno(btnMostrar.dataset.alumno); return; }
+  const chip = e.target.closest('.chip[data-alumno]');
+  if (chip) { alumnoFiltro = chip.dataset.alumno || null; renderChips(); renderTabla(); return; }
+});
 
 document.querySelectorAll('#filtroEstado .filtro').forEach(btn => {
   btn.addEventListener('click', () => {
     estadoFiltro = btn.dataset.filtro;
     document.querySelectorAll('#filtroEstado .filtro').forEach(b => b.classList.toggle('active', b === btn));
-    if (mode === 'single' && activeName) loadSingle(activeName, students.find(s=>s.nombre===activeName).url);
-    else if (mode === 'combined') loadCombined();
+    renderTabla();
   });
 });
 
-// Trae el Sheet índice (Nombre,Link) si está configurado, para que cualquier
-// dispositivo vea la lista completa de alumnos sin depender de localStorage.
-async function loadRegistry() {
-  if (!REGISTRY_URL) return;
+async function cargarTodo() {
+  const el = document.getElementById('resultado');
+  el.innerHTML = '<div class="empty">Cargando…</div>';
   try {
-    const text = await (await fetch(REGISTRY_URL, { cache: 'no-store' })).text();
-    const rows = parseCSV(text);
-    if (!rows.length) return;
-    const headers = rows[0].map(h => h.trim());
-    const iN = headers.indexOf('Nombre'), iL = headers.indexOf('Link');
-    const rawRegistry = rows.slice(1)
-      .filter(r => r.some(c => c.trim() !== ''))
-      .map(r => ({ nombre: (r[iN] || '').trim(), url: (r[iL] || '').trim() }))
-      .filter(s => s.nombre && s.url);
-    // Si el alumno llenó el Form dos veces (ej. corrigiendo un typo), gana la más reciente.
-    const fromRegistry = Array.from(new Map(rawRegistry.map(s => [s.nombre, s])).values());
-    students = mergeStudents(students, fromRegistry);
-    saveStudents(students);
+    const [records, ocultosList] = await Promise.all([fetchPendientes(), fetchOcultos()]);
+    allRecords = records;
+    ocultos = new Set(ocultosList);
+    renderChips();
+    renderTabla();
   } catch (e) {
-    console.warn('No se pudo cargar el índice de alumnos:', e.message);
+    el.innerHTML = `<div class="error">No se pudo cargar: ${escapeHtml(e.message)}</div>`;
   }
 }
 
-// Arranque: soporta ?sheet=<url>&nombre=<nombre> para compartir un link directo.
+// Arranque: soporta ?alumno=<nombre> para abrir directo filtrado a un alumno.
 (async function init() {
   const params = new URLSearchParams(location.search);
   if (params.get('selftest') === '1') return; // no disparar red durante el autocheck
-  await loadRegistry();
-  renderChips();
-  const sheet = params.get('sheet');
-  if (sheet) {
-    const nombre = params.get('nombre') || 'Alumno';
-    loadSingle(nombre, sheet);
-  } else if (students.length) {
-    loadCombined();
-  }
+  const a = params.get('alumno');
+  if (a) alumnoFiltro = normalizeAlumno(a);
+  await cargarTodo();
 })();
 
 // Autocheck del parser CSV y de fechas: abrir index.html?selftest=1
@@ -427,6 +426,11 @@ if (new URLSearchParams(location.search).get('selftest') === '1') {
     check('orden ambiguo cae a dmy', detectSlashDateOrder(['03/04/2026']), 'dmy');
     check('fecha dd/mm/yyyy con orden inferido', parseDateFlexible('15/03/2026', 'dmy').getTime(), new Date(2026,2,15).getTime());
     check('fecha mm/dd/yyyy con orden inferido', parseDateFlexible('03/15/2026', 'mdy').getTime(), new Date(2026,2,15).getTime());
+    check('marca temporal con hora se recorta al día', parseDateFlexible('3/7/2026 21:01:19', 'mdy').getTime(), new Date(2026,2,7).getTime());
+    check('orden detectado ignora la hora', detectSlashDateOrder(['13/7/2026 21:01:19']), 'dmy');
+
+    check('normaliza espacios de sobra', normalizeAlumno('Elvis   '), 'Elvis');
+    check('normaliza espacios internos dobles', normalizeAlumno('Elvis  Garcia'), 'Elvis Garcia');
 
     const recs = [
       { fecha: new Date(2026,0,1), fechaLimite: new Date(2026,5,1) },
@@ -436,12 +440,6 @@ if (new URLSearchParams(location.search).get('selftest') === '1') {
     ];
     const orden = sortRecords(recs).map(r => r.fechaLimite ? +r.fechaLimite : 'sin-fecha:' + r.fecha.getFullYear());
     check('orden por urgencia', orden, [+new Date(2026,1,1), +new Date(2026,5,1), 'sin-fecha:2025', 'sin-fecha:2026']);
-
-    const mergido = mergeStudents(
-      [{nombre:'Ana', url:'urlvieja'}, {nombre:'Beto', url:'urlbeto'}],
-      [{nombre:'Ana', url:'urlnueva'}]
-    );
-    check('importar reemplaza por nombre y conserva el resto', mergido, [{nombre:'Beto', url:'urlbeto'}, {nombre:'Ana', url:'urlnueva'}]);
 
     const estados = [{estado:'Pendiente'}, {estado:'En progreso'}, {estado:'Resuelto'}];
     check('filtro activos oculta resueltos', filterByEstado(estados,'activos').map(r=>r.estado), ['Pendiente','En progreso']);

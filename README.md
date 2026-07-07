@@ -1,69 +1,72 @@
 # Pendientes del lab
 
-Herramienta estática (un solo `index.html`, sin backend) para que la asesora vea,
-por alumno, qué pendientes hay conmigo. Lee directo de un CSV publicado de Google
-Sheets; no escribe nada de vuelta.
+Dashboard estático (un solo `index.html`) para que la asesora vea qué pendientes
+hay con cada alumno, y los marque como resueltos con un clic. Los alumnos
+registran sus pendientes por un Google Form compartido; no crean su propio Sheet.
 
-## Por alumno: publicar el Sheet como CSV
+## Arquitectura
 
-En el Google Sheet del alumno: **Archivo → Compartir → Publicar en la web** →
-elegir la hoja → formato **CSV** → Publicar. Copiar el link que te da (termina en
-`output=csv`).
+- **Un Form único** (preguntas: `Alumno`, `Pendiente`, `Contexto`, `Fecha límite`,
+  `Notas`) que cualquier alumno llena cada vez que tiene un pendiente nuevo.
+- Sus respuestas caen en **un Sheet único**, con una columna extra `Estado`
+  agregada a mano (vacía = Pendiente).
+- Una pestaña `AlumnosOcultos` (columna `Alumno`) para ocultar de la vista a
+  alguien sin borrar su historial.
+- Un **Apps Script Web App** que el HTML llama para marcar un pendiente como
+  resuelto, u ocultar/mostrar un alumno — es la única escritura del sistema.
+  Todo lo demás es lectura de CSV publicado.
 
-Encabezados exigidos en la fila 1, en este orden y con este texto exacto:
+Trade-off aceptado: el Apps Script se despliega con acceso "Cualquier usuario"
+(sin login), así que el link queda visible en el código de la página — en
+teoría cualquiera que lo encuentre podría marcar algo como resuelto. Se aceptó
+este riesgo a cambio de que la asesora no tenga que abrir el Sheet directamente.
 
-```
-Fecha | Pendiente | Contexto | Fecha límite | Estado | Notas
-```
+## Armar el Form (una sola vez)
 
-`Estado` debe ser uno de: `Pendiente`, `En progreso`, `Resuelto`. Cada ronda de
-corrección es una fila nueva; nunca se borra ni se reutiliza una fila.
+Preguntas, en este orden:
 
-**Formato de fecha:** el alumno escribe la fecha como sea más natural para él,
-no hace falta pedirle que cambie el formato de la celda. Cada Sheet puede tener
-un locale distinto (`dd/mm/aaaa` o `mm/dd/aaaa`), pero el HTML infiere el orden
-solo: si en esa columna algún día pasa de 12, ese slot solo puede ser el día
-(no el mes), y de ahí deduce el orden para toda la columna. Solo en el caso
-ambiguo (ningún valor de la columna pasa de 12, ej. todas las fechas caen en la
-primera mitad del mes) asume `dd/mm/aaaa` por default.
+| # | Pregunta | Tipo | Obligatoria |
+|---|----------|------|:---:|
+| 1 | `Alumno` | Respuesta corta | Sí |
+| 2 | `Pendiente` | Selección múltiple: `Tesis`, `Artículo`, `Otro` (+ opción "Otro") | Sí |
+| 3 | `Contexto` | Párrafo | Sí |
+| 4 | `Fecha límite` | **Fecha** (tipo nativo, no texto) | No |
+| 5 | `Notas` | Párrafo | No |
+
+En Configuración: desmarcar "Limitar a 1 respuesta" (cada alumno lo llena
+muchas veces). No pedir correo.
+
+En Respuestas → ícono de Sheets → crear hoja nueva. Ahí:
+1. Agregar a mano la columna `Estado` (vacía).
+2. Agregar una pestaña nueva `AlumnosOcultos` con columna `Alumno` (vacía).
+3. Publicar como CSV (Archivo → Compartir → Publicar en la web) **la hoja de
+   respuestas** y **la pestaña `AlumnosOcultos`** por separado — dos links CSV.
+4. Extensiones → Apps Script → pegar el código de `apps_script_marcar_resuelto.gs`
+   (fuera de este repo, ver abajo) → Implementar → Aplicación web → Ejecutar
+   como "Yo", acceso "Cualquier usuario" → copiar la URL `/exec`.
+5. Poner los 3 links en `SHEET_URL`, `OCULTOS_URL` y `APPSCRIPT_URL` al inicio
+   del `<script>` de `index.html`.
+
+El script `.gs` vive fuera de este repo (no se sube a GitHub porque no aporta
+nada público); pídeselo a quien armó el proyecto si hace falta reinstalarlo.
 
 ## Uso
 
-Abrir `index.html` (o la versión en GitHub Pages). La lista de alumnos se carga
-sola desde el Sheet índice (ver sección de abajo); no hay que pegar nada a mano.
-
 - Selector con 3 vistas: **Activos** (default), **Todos**, **Solo resueltos**.
+- Chips por alumno (derivados de los datos, no hay que registrar a nadie
+  aparte): clic filtra, la "✕" lo oculta (con confirmación).
 - Orden: primero vencidos/más próximos por `Fecha límite`, luego los sin fecha
-  límite por `Fecha` más antigua.
+  límite por `Fecha` (registro) más antigua.
 - Marca ⚠ los pendientes con 14+ días abiertos sin resolver.
-- "Ver todos combinados" junta los pendientes activos de todos los alumnos
-  del índice.
-- `?sheet=<url-csv>&nombre=<nombre>` en la URL abre directo un alumno puntual
-  (para compartir un link ya cargado, sin que tenga que estar en el índice).
+- Botón **"Marcar resuelto"** por fila activa — escribe `Resuelto` en el Sheet
+  vía el Apps Script y recarga.
+- `?alumno=<nombre>` en la URL abre directo filtrado a un alumno.
 
-## Ver la lista de alumnos en cualquier dispositivo (sin depender de ti)
-
-`localStorage` es por navegador/dispositivo: si agregas un alumno en la laptop,
-no aparece solo en el celular. La solución es un **Sheet índice + Google Form**,
-para que un alumno nuevo se dé de alta sin que tú tengas que estar disponible:
-
-1. Crea un Google Form con dos preguntas de respuesta corta, tituladas
-   exactamente `Nombre` y `Link`. En Respuestas → ícono de Sheets, deja que
-   cree la hoja de respuestas — esa hoja ya es tu índice, no hace falta crear
-   una aparte.
-2. Publica esa hoja como CSV (Archivo → Compartir → Publicar en la web →
-   CSV) y pon esa URL en la constante `REGISTRY_URL` al inicio del `<script>`
-   de `index.html`.
-3. Comparte el link del Form (el de "Enviar" → 🔗, no el de edición)
-   directamente con tus compañeros, por el canal que ya uses con ellos —
-   WhatsApp, correo, etc. No hace falta ponerlo en esta página: el dashboard
-   es para tu asesora, tus compañeros nunca necesitan abrirlo.
-
-Un alumno nuevo: publica su propio Sheet como CSV → llena el Form con su
-nombre y ese link. Cualquier dispositivo que abra el dashboard después carga
-sola la lista completa — nadie toca nada más, el Form escribe al Sheet y el
-HTML solo lee. Si alguien llena el Form dos veces (ej. corrigiendo un typo),
-gana la respuesta más reciente.
+**Formato de fecha:** el alumno escribe la fecha en `Fecha límite` con el
+selector nativo del Form (no texto libre), así que siempre es una fecha real.
+El Sheet puede tener locale `dd/mm/aaaa` o `mm/dd/aaaa` según cómo esté
+configurado; el HTML infiere el orden solo por columna (si algún valor pasa de
+12, ese slot es el día).
 
 ## Publicar en GitHub Pages
 
@@ -72,5 +75,5 @@ sirve `index.html` directo.
 
 ## Autocheck
 
-`index.html?selftest=1` corre unas verificaciones del parser de CSV/fechas y
-del orden de urgencia (no requiere red).
+`index.html?selftest=1` corre verificaciones del parser de CSV/fechas, el
+orden de urgencia y la normalización de nombres (no requiere red).
