@@ -302,7 +302,8 @@ function renderTabla() {
     if (r.fechaLimite) {
       const d = daysBetween(r.fechaLimite, today);
       const cls = d > 0 ? 'vencido' : (d >= -SOON_DAYS ? 'pronto' : '');
-      const label = d > 0 ? `${r.fechaLimiteRaw} (vencido ${d}d)` : r.fechaLimiteRaw;
+      const sufijo = d > 0 ? `vencido ${d}d` : d === 0 ? 'hoy' : `en ${-d}d`;
+      const label = `${r.fechaLimiteRaw} (${sufijo})`;
       deadlineHtml = `<span class="deadline ${cls}">${escapeHtml(label)}</span>`;
     }
     let staleHtml = '';
