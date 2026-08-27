@@ -195,8 +195,23 @@ function estadoClass(estado) {
   return 'pendiente';
 }
 
+// El redirect de docs.google.com al host de descarga se cuelga sin resolver a
+// ratos (unas 4 de cada 10 veces); abortamos a los 8s y reintentamos en vez de
+// dejar la página en "Cargando…" para siempre.
+async function fetchTextConReintento(url, intentos = 5) {
+  for (let i = 0; i < intentos; i++) {
+    try {
+      const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.text();
+    } catch (e) {
+      if (i === intentos - 1) throw e;
+    }
+  }
+}
+
 async function fetchPendientes() {
-  const text = await (await fetch(SHEET_URL, { cache: 'no-store' })).text();
+  const text = await fetchTextConReintento(SHEET_URL);
   const rows = parseCSV(text);
   if (!rows.length) return [];
   const headers = rows[0].map(h => h.trim());
@@ -219,7 +234,7 @@ async function fetchPendientes() {
 }
 
 async function fetchOcultos() {
-  const text = await (await fetch(OCULTOS_URL, { cache: 'no-store' })).text();
+  const text = await fetchTextConReintento(OCULTOS_URL);
   const rows = parseCSV(text);
   if (!rows.length) return [];
   const headers = rows[0].map(h => h.trim());
@@ -446,6 +461,19 @@ if (new URLSearchParams(location.search).get('selftest') === '1') {
     check('filtro activos oculta resueltos', filterByEstado(estados,'activos').map(r=>r.estado), ['Pendiente','En progreso']);
     check('filtro todos muestra todo', filterByEstado(estados,'todos').map(r=>r.estado), ['Pendiente','En progreso','Resuelto']);
     check('filtro solo resueltos', filterByEstado(estados,'resueltos').map(r=>r.estado), ['Resuelto']);
+
+    (async () => {
+      const origFetch = window.fetch;
+      let n = 0;
+      window.fetch = () => (++n < 3)
+        ? Promise.reject(new Error('cuelgue simulado'))
+        : Promise.resolve({ ok: true, text: () => Promise.resolve('OK') });
+      const got = await fetchTextConReintento('x', 5);
+      window.fetch = origFetch;
+      check('fetchTextConReintento reintenta tras fallos', [got, n], ['OK', 3]);
+      document.getElementById('resultado').insertAdjacentHTML('beforeend',
+        `<div style="color:${got==='OK'&&n===3?'green':'red'}">${got==='OK'&&n===3?'PASS':'FAIL'} — fetchTextConReintento reintenta tras fallos</div>`);
+    })();
 
     const html = results.map(r => `<div style="color:${r.ok?'green':'red'}">${r.ok?'PASS':'FAIL'} — ${r.label}` +
       (r.ok ? '' : ` (esperado ${JSON.stringify(r.want)}, obtuve ${JSON.stringify(r.got)})`) + '</div>').join('');
